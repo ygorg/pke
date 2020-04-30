@@ -389,7 +389,7 @@ class YAKE(LoadFile):
                     # self.weights[candidate] /= TF * (1 + sum(weights))
                     # self.surface_to_lexical[candidate] = k
 
-    def is_redundant(self, candidate, prev, threshold=0.8):
+    def _is_redundant(self, candidate, prev, threshold=0.8):
         """Test if one candidate is redundant with respect to a list of already
         selected candidates. A candidate is considered redundant if its
         levenshtein distance, with another candidate that is ranked higher in
@@ -442,9 +442,9 @@ class YAKE(LoadFile):
             for candidate in best:
 
                 # test wether candidate is redundant
-                if self.is_redundant(candidate,
-                                     non_redundant_best,
-                                     threshold=threshold):
+                if self._is_redundant(candidate,
+                                      non_redundant_best,
+                                      threshold=threshold):
                     continue
 
                 # add the candidate otherwise

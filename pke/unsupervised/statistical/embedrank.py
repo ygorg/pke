@@ -38,6 +38,7 @@ class EmbedRank(LoadFile):
     _embedding_model = None
 
     def __init__(self, embedding_path=None):
+        """Initializer for EmbedRank class."""
         try:
             import sent2vec  # See https://github.com/epfml/sent2vec
         except ImportError:

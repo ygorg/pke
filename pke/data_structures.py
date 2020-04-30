@@ -4,24 +4,23 @@
 
 
 class Sentence(object):
-    """The sentence data structure."""
+    """The sentence data structure.
+
+    Attributes:
+        words (List[str]): list of words (tokens) in the sentence.
+        pos (List[str]): list of Part-Of-Speeches.
+        stems (List[str]): list of stems.
+        length (int): length (number of tokens) of the sentence.
+        meta (Dict[str, Any]): meta-information of the sentence.
+    """
 
     def __init__(self, words):
-
+        """Initializer for Sentence class."""
         self.words = words
-        """list of words (tokens) in the sentence."""
-
         self.pos = []
-        """list of Part-Of-Speeches."""
-
         self.stems = []
-        """list of stems."""
-
         self.length = len(words)
-        """length (number of tokens) of the sentence."""
-
         self.meta = {}
-        """meta-information of the sentence."""
 
     def __eq__(self, other):
         """Compares two sentences for equality."""
@@ -55,43 +54,45 @@ class Sentence(object):
 
 
 class Candidate(object):
-    """The keyphrase candidate data structure."""
+    """The keyphrase candidate data structure.
+
+    Attributes:
+        surface_forms (List[str]): the surface forms of the candidate.
+        offsets (List[int]): the offsets of the surface forms.
+        sentence_ids (List[int]): the sentence id of each surface form.
+        pos_patterns (List[List[str]): the Part-Of-Speech patterns of the candidate.
+        lexical_form (List[token]): the lexical form of the candidate.
+    """
 
     def __init__(self):
+        """Initializer for Candidate class."""
 
         self.surface_forms = []
-        """ the surface forms of the candidate. """
-
         self.offsets = []
-        """ the offsets of the surface forms. """
-
         self.sentence_ids = []
-        """ the sentence id of each surface form. """
-
         self.pos_patterns = []
-        """ the Part-Of-Speech patterns of the candidate. """
-
         self.lexical_form = []
-        """ the lexical form of the candidate. """
 
 
 class Document(object):
-    """The Document data structure."""
+    """The Document data structure.
+
+    Attributes:
+        input_file (str): The path of the input file.
+        sentences (List[Sentence]: The sentence container (list of Sentence).
+    """
 
     def __init__(self):
-
+        """Initializer for Document class."""
         self.input_file = None
-        """ The path of the input file. """
-
         self.sentences = []
-        """ The sentence container (list of Sentence). """
 
     @staticmethod
     def from_sentences(sentences, **kwargs):
         """Populate the sentence list.
 
         Args:
-            sentences (Sentence list): content to create the document.
+            sentences (List[Sentence]): content to create the document.
             input_file (str): path to the input file.
         """
 

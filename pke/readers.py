@@ -10,17 +10,34 @@ from pke.data_structures import Document
 
 
 class Reader(object):
+    """Abstract class for Readers."""
+
     def read(self, path):
+        """Read data to create a Document Object.
+
+        Returns:
+            A populated Document object.
+            """
         raise NotImplementedError
 
 
 class MinimalCoreNLPReader(Reader):
-    """Minimal CoreNLP XML Parser."""
+    """Minimal CoreNLP XML Parser.
+
+    Attributes:
+        parser (etree.XMLParser): An XML parser.
+    """
 
     def __init__(self):
+        """Initializer for MinimalCoreNLPReader class."""
         self.parser = etree.XMLParser()
 
     def read(self, path, **kwargs):
+        """Read an CoreNLP XML file.
+
+        Args:
+            path (str): Path to XML file.
+        """
         sentences = []
         tree = etree.parse(path, self.parser)
         for sentence in tree.iterfind('./document/sentences/sentence'):
@@ -51,6 +68,8 @@ def fix_spacy_for_french(nlp):
     For some special tokenisation cases, spacy do not assign a `pos` field.
 
     Taken from https://github.com/explosion/spaCy/issues/5179.
+    Edit 29/04/2020: this problem was fixed in https://github.com/explosion/spaCy/pull/5202.
+        spacy v2.2.5 will probably include this PR.
     """
     from spacy.symbols import TAG
     if nlp.lang != 'fr':
@@ -74,15 +93,14 @@ def fix_spacy_for_french(nlp):
 
 
 class RawTextReader(Reader):
-    """Reader for raw text."""
+    """Reader for raw text.
+
+    Attributes:
+        language (str): language of text to process (defaults to 'en').
+    """
 
     def __init__(self, language=None):
-        """Constructor for RawTextReader.
-
-        Args:
-            language (str): language of text to process.
-        """
-
+        """Initializer for RawTextReader class."""
         self.language = language
 
         if language is None:

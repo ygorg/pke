@@ -30,37 +30,40 @@ escaped_punctuation = {'-lrb-': '(', '-rrb-': ')', '-lsb-': '[', '-rsb-': ']',
 
 
 class LoadFile(object):
-    """The LoadFile class that provides base functions."""
+    """The LoadFile class that provides base functions.
+
+    Attributes:
+        input_file (str): Path to the input file.
+        language (str): Language of the input file.
+        normalization (str): Word normalization method ('stemming' or
+            'lemmatization').
+        stoplist (List[str]): List of stopwords.
+        sentences (List[Sentence]): Sentence container.
+        candidates (Dict[str, Candidate]): Keyphrase candidates container.
+        weights (Dict[str, float]): Weight container (can be either word or
+            candidate weights).
+
+        _models (str): Root path of the models.
+        _df_counts (str): Path to the document frequency counts provided in pke.
+    """
 
     def __init__(self):
         """Initializer for LoadFile class."""
 
         self.input_file = None
-        """Path to the input file."""
-
         self.language = None
-        """Language of the input file."""
-
         self.normalization = None
-        """Word normalization method."""
-
+        self.stoplist = None
         self.sentences = []
-        """Sentence container (list of Sentence objects)."""
-
         self.candidates = defaultdict(Candidate)
-        """Keyphrase candidates container (dict of Candidate objects)."""
-
         self.weights = {}
-        """Weight container (can be either word or candidate weights)."""
 
         self._models = os.path.join(os.path.dirname(__file__), 'models')
-        """Root path of the models."""
-
         self._df_counts = os.path.join(self._models, "df-semeval2010.tsv.gz")
-        """Path to the document frequency counts provided in pke."""
 
-        self.stoplist = None
-        """List of stopwords."""
+    ###
+    # Loading document
+    ###
 
     def load_document(self, input, **kwargs):
         """Loads the content of a document/string/stream in a given language.
@@ -140,7 +143,7 @@ class LoadFile(object):
         # word normalization
         self.normalization = kwargs.get('normalization', 'stemming')
         if self.normalization == 'stemming':
-            self.apply_stemming()
+            self._apply_stemming()
         elif self.normalization is None:
             for i, sentence in enumerate(self.sentences):
                 self.sentences[i].stems = sentence.words
@@ -151,10 +154,10 @@ class LoadFile(object):
 
         # POS normalization
         if getattr(doc, 'is_corenlp_file', False):
-            self.normalize_pos_tags()
-            self.unescape_punctuation_marks()
+            self._normalize_pos_tags()
+            self._unescape_punctuation_marks()
 
-    def apply_stemming(self):
+    def _apply_stemming(self):
         """Populates the stem containers of sentences."""
 
         if self.language == 'en':
@@ -169,7 +172,7 @@ class LoadFile(object):
         for i, sentence in enumerate(self.sentences):
             self.sentences[i].stems = [stemmer.stem(w) for w in sentence.words]
 
-    def normalize_pos_tags(self):
+    def _normalize_pos_tags(self):
         """Normalizes the PoS tags from udp-penn to UD."""
 
         if self.language == 'en':
@@ -178,100 +181,26 @@ class LoadFile(object):
                 self.sentences[i].pos = [map_tag('en-ptb', 'universal', tag)
                                          for tag in sentence.pos]
 
-    def unescape_punctuation_marks(self):
+    def _unescape_punctuation_marks(self):
         """Replaces the special punctuation marks produced by CoreNLP."""
 
         for i, sentence in enumerate(self.sentences):
             for j, word in enumerate(sentence.words):
                 l_word = word.lower()
-                self.sentences[i].words[j] = escaped_punctuation.get(l_word,
-                                                                     word)
+                self.sentences[i].words[j] = escaped_punctuation.get(
+                    l_word, word)
 
-    def is_redundant(self, candidate, prev, minimum_length=1):
-        """Test if one candidate is redundant with respect to a list of already
-        selected candidates. A candidate is considered redundant if it is
-        included in another candidate that is ranked higher in the list.
+    ###
+    # Selecting candidates
+    ###
 
-        Args:
-            candidate (str): the lexical form of the candidate.
-            prev (list): the list of already selected candidates (lexical
-                forms).
-            minimum_length (int): minimum length (in words) of the candidate
-                to be considered, defaults to 1.
-        """
+    def candidate_selection(self):
+        """Populates the candidates attributes.
 
-        # get the tokenized lexical form from the candidate
-        candidate = self.candidates[candidate].lexical_form
+        Abstract function to be overloaded."""
+        raise NotImplementedError
 
-        # only consider candidate greater than one word
-        if len(candidate) < minimum_length:
-            return False
-
-        # get the tokenized lexical forms from the selected candidates
-        prev = [self.candidates[u].lexical_form for u in prev]
-
-        # loop through the already selected candidates
-        for prev_candidate in prev:
-            for i in range(len(prev_candidate) - len(candidate) + 1):
-                if candidate == prev_candidate[i:i + len(candidate)]:
-                    return True
-        return False
-
-    def get_n_best(self, n=10, redundancy_removal=False, stemming=False):
-        """Returns the n-best candidates given the weights.
-
-        Args:
-            n (int): the number of candidates, defaults to 10.
-            redundancy_removal (bool): whether redundant keyphrases are
-                filtered out from the n-best list, defaults to False.
-            stemming (bool): whether to extract stems or surface forms
-                (lowercased, first occurring form of candidate), default to
-                False.
-        """
-
-        # sort candidates by descending weight
-        best = sorted(self.weights, key=self.weights.get, reverse=True)
-
-        # remove redundant candidates
-        if redundancy_removal:
-
-            # initialize a new container for non redundant candidates
-            non_redundant_best = []
-
-            # loop through the best candidates
-            for candidate in best:
-
-                # test wether candidate is redundant
-                if self.is_redundant(candidate, non_redundant_best):
-                    continue
-
-                # add the candidate otherwise
-                non_redundant_best.append(candidate)
-
-                # break computation if the n-best are found
-                if len(non_redundant_best) >= n:
-                    break
-
-            # copy non redundant candidates in best container
-            best = non_redundant_best
-
-        # get the list of best candidates as (lexical form, weight) tuples
-        n_best = [(u, self.weights[u]) for u in best[:min(n, len(best))]]
-
-        # replace with surface forms if no stemming
-        if not stemming:
-            n_best = [(' '.join(self.candidates[u].surface_forms[0]).lower(),
-                       self.weights[u]) for u in best[:min(n, len(best))]]
-
-        if len(n_best) < n:
-            logging.warning(
-                'Not enough candidates to choose from '
-                '({} requested, {} given)'.format(n, len(n_best)))
-
-        # return the list of best candidates
-        return n_best
-
-    def add_candidate(self, words, stems, pos, offset, sentence_id):
+    def _add_candidate(self, words, stems, pos, offset, sentence_id):
         """Add a keyphrase candidate to the candidates container.
 
         Args:
@@ -320,25 +249,17 @@ class LoadFile(object):
             for j in range(sentence.length):
                 for k in range(j + 1, min(j + 1 + skip, sentence.length + 1)):
                     # add the ngram to the candidate container
-                    self.add_candidate(words=sentence.words[j:k],
-                                       stems=sentence.stems[j:k],
-                                       pos=sentence.pos[j:k],
-                                       offset=shift + j,
-                                       sentence_id=i)
+                    self._add_candidate(words=sentence.words[j:k],
+                                        stems=sentence.stems[j:k],
+                                        pos=sentence.pos[j:k],
+                                        offset=shift + j,
+                                        sentence_id=i)
 
-    def longest_pos_sequence_selection(self, valid_pos=None):
-        self.longest_sequence_selection(
-            key=lambda s: s.pos, valid_values=valid_pos)
-
-    def longest_keyword_sequence_selection(self, keywords):
-        self.longest_sequence_selection(
-            key=lambda s: s.stems, valid_values=keywords)
-
-    def longest_sequence_selection(self, key, valid_values):
-        """Select the longest sequences of given POS tags as candidates.
+    def _longest_sequence_selection(self, key, valid_values):
+        """Select the longest sequences of valid sentence attribute as candidates.
 
         Args:
-            key (func) : function that given a sentence return an iterable
+            key (Callable[[Sentence], List]) : function that given a sentence return an iterable
             valid_values (set): the set of valid values, defaults to None.
         """
 
@@ -364,14 +285,36 @@ class LoadFile(object):
                 if seq:
 
                     # add the ngram to the candidate container
-                    self.add_candidate(words=sentence.words[seq[0]:seq[-1] + 1],
-                                       stems=sentence.stems[seq[0]:seq[-1] + 1],
-                                       pos=sentence.pos[seq[0]:seq[-1] + 1],
-                                       offset=shift + seq[0],
-                                       sentence_id=i)
+                    self._add_candidate(words=sentence.words[seq[0]:seq[-1] + 1],
+                                        stems=sentence.stems[seq[0]:seq[-1] + 1],
+                                        pos=sentence.pos[seq[0]:seq[-1] + 1],
+                                        offset=shift + seq[0],
+                                        sentence_id=i)
 
                 # flush sequence container
                 seq = []
+
+    def longest_pos_sequence_selection(self, valid_pos=None):
+        """Selects the longest sequence of valid pos.
+
+        Morally equivalent to re.findall(r'[valid_pos]*')
+
+        Args:
+            valid_pos (List[str]): List of part-of-speech tag.
+        """
+        self._longest_sequence_selection(
+            key=lambda s: s.pos, valid_values=valid_pos)
+
+    def longest_keyword_sequence_selection(self, keywords):
+        """Selects the longest sequence of valid stems.
+
+        Morally equivalent to re.findall(r'[keywords]*')
+
+        Args:
+            keywords (List[str]): List of stemmed tokens.
+        """
+        self._longest_sequence_selection(
+            key=lambda s: s.stems, valid_values=keywords)
 
     def grammar_selection(self, grammar=None):
         """Select candidates using nltk RegexpParser with a grammar defining
@@ -417,11 +360,15 @@ class LoadFile(object):
                     last = int(leaves[-1][0])
 
                     # add the NP to the candidate container
-                    self.add_candidate(words=sentence.words[first:last + 1],
-                                       stems=sentence.stems[first:last + 1],
-                                       pos=sentence.pos[first:last + 1],
-                                       offset=shift + first,
-                                       sentence_id=i)
+                    self._add_candidate(words=sentence.words[first:last + 1],
+                                        stems=sentence.stems[first:last + 1],
+                                        pos=sentence.pos[first:last + 1],
+                                        offset=shift + first,
+                                        sentence_id=i)
+
+    ###
+    # Candidate filtering
+    ###
 
     @staticmethod
     def _is_alphanum(word, valid_punctuation_marks='-'):
@@ -449,7 +396,7 @@ class LoadFile(object):
         keep the candidates containing alpha-numeric characters (if the
         non_latin_filter is set to True) and those length exceeds a given
         number of characters.
-            
+
         Args:
             stoplist (list): list of strings, defaults to None.
             minimum_length (int): minimum number of characters for a
@@ -511,3 +458,92 @@ class LoadFile(object):
                             for w in words]):
                     del self.candidates[k]
 
+    def candidate_weighting(self):
+        """Populates the weights attributes.
+
+        Abstract function to be overloaded."""
+        raise NotImplementedError
+
+    def _is_redundant(self, candidate, prev, minimum_length=1):
+        """Test if one candidate is redundant with respect to a list of already
+        selected candidates. A candidate is considered redundant if it is
+        included in another candidate that is ranked higher in the list.
+
+        Args:
+            candidate (str): the lexical form of the candidate.
+            prev (list): the list of already selected candidates (lexical
+                forms).
+            minimum_length (int): minimum length (in words) of the candidate
+                to be considered, defaults to 1.
+        """
+
+        # get the tokenized lexical form from the candidate
+        candidate = self.candidates[candidate].lexical_form
+
+        # only consider candidate greater than one word
+        if len(candidate) < minimum_length:
+            return False
+
+        # get the tokenized lexical forms from the selected candidates
+        prev = [self.candidates[u].lexical_form for u in prev]
+
+        # loop through the already selected candidates
+        for prev_candidate in prev:
+            for i in range(len(prev_candidate) - len(candidate) + 1):
+                if candidate == prev_candidate[i:i + len(candidate)]:
+                    return True
+        return False
+
+    def get_n_best(self, n=10, redundancy_removal=False, stemming=False):
+        """Returns the n-best candidates given the weights.
+
+        Args:
+            n (int): the number of candidates, defaults to 10.
+            redundancy_removal (bool): whether redundant keyphrases are
+                filtered out from the n-best list, defaults to False.
+            stemming (bool): whether to extract stems or surface forms
+                (lowercased, first occurring form of candidate), default to
+                False.
+        """
+
+        # sort candidates by descending weight
+        best = sorted(self.weights, key=self.weights.get, reverse=True)
+
+        # remove redundant candidates
+        if redundancy_removal:
+
+            # initialize a new container for non redundant candidates
+            non_redundant_best = []
+
+            # loop through the best candidates
+            for candidate in best:
+
+                # test wether candidate is redundant
+                if self._is_redundant(candidate, non_redundant_best):
+                    continue
+
+                # add the candidate otherwise
+                non_redundant_best.append(candidate)
+
+                # break computation if the n-best are found
+                if len(non_redundant_best) >= n:
+                    break
+
+            # copy non redundant candidates in best container
+            best = non_redundant_best
+
+        # get the list of best candidates as (lexical form, weight) tuples
+        n_best = [(u, self.weights[u]) for u in best[:min(n, len(best))]]
+
+        # replace with surface forms if no stemming
+        if not stemming:
+            n_best = [(' '.join(self.candidates[u].surface_forms[0]).lower(),
+                       self.weights[u]) for u in best[:min(n, len(best))]]
+
+        if len(n_best) < n:
+            logging.warning(
+                'Not enough candidates to choose from '
+                '({} requested, {} given)'.format(n, len(n_best)))
+
+        # return the list of best candidates
+        return n_best
