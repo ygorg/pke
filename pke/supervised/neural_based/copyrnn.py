@@ -41,7 +41,7 @@ class CopyRNN(LoadFile):
         except ImportError as e:
             raise ImportError(
                 'Module allennlp was not found. It is required by neural models. '\
-                'Please install using : `pip install allennlp`')
+                'Please install using : `pip install allennlp==0.8.5`')
 
         # Import to register allennlp objects
         import pke.supervised.neural_based.nke_copyrnn
@@ -79,27 +79,12 @@ class CopyRNN(LoadFile):
         self._model_predictor = CopyRNN._model_predictor
         self._model_path = CopyRNN._model_path
 
-    def load_document(self, inpu):
-        self.doc = inpu
-        super().load_document(inpu)
-        doc = ''
-        for s in self.sentences:
-            for w, o in zip(s.words, s.meta['char_offsets']):
-                doc += ' ' * (o[0] - len(doc)) + w
-        return doc
-
     def candidate_selection(self):
         pass
 
     def candidate_weighting(self):
         # Recreate the document for inputting in the model.
-        text = self.doc
-        doc = ''
-        for s in self.sentences:
-            for w, o in s.words, s.meta['char_offsets']:
-                doc += ' ' * (o[0] - len(doc)) + w
-
-        assert text == doc
+        text = ' '.join([' '.join(s.words) for s in self.sentences])
 
         if self.language == 'en':
             # create a new instance of a porter stemmer
