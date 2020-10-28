@@ -297,15 +297,9 @@ class LoadFile(object):
         # get the list of best candidates as (lexical form, weight) tuples
         n_best = [(u, self.weights[u]) for u in best[:min(n, len(best))]]
 
-        # replace with surface forms if no stemming
         if not stemming:
             n_best = [(' '.join(self.candidates[u].surface_forms[0]).lower(),
                        self.weights[u]) for u in best[:min(n, len(best))]]
-
-        if len(n_best) < n:
-            logging.warning(
-                'Not enough candidates to choose from '
-                '({} requested, {} given)'.format(n, len(n_best)))
 
         # return the list of best candidates
         return n_best

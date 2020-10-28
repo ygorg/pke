@@ -16,5 +16,6 @@ from pke.unsupervised.graph_based.collabrank import CollabRank
 from pke.unsupervised.statistical.tfidf import TfIdf
 from pke.unsupervised.statistical.kpminer import KPMiner
 from pke.unsupervised.statistical.yake import YAKE
+from pke.unsupervised.statistical.yake_2 import YAKE2
 from pke.unsupervised.statistical.firstphrases import FirstPhrases
 from pke.unsupervised.statistical.embedrank import EmbedRank
