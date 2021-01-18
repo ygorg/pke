@@ -320,16 +320,23 @@ class YAKE2(LoadFile):
             E = self.features[word]['DIFFERENT']
             self.features[word]['weight'] = (D * B) / (A + (C / D) + (E / D))
 
-    def candidate_weighting(self, window=2, stoplist=None, use_stems=False, ecir_weight=False):
+    def candidate_weighting(self, window=2, stoplist=None, use_stems=False, ecir_weight=False, pool_best=False):
         """Candidate weight calculation as described in the YAKE paper.
 
         Args:
+            window (int): the size in words of the window used for computing
+                co-occurrence counts, defaults to 2.
             stoplist (list): the stoplist for filtering candidates, defaults to
                 the nltk stoplist.
             use_stems (bool): whether to use stems instead of lowercase words
                 for weighting, defaults to False.
-            window (int): the size in words of the window used for computing
-                co-occurrence counts, defaults to 2.
+            ecir_weight (bool): compute weights as presented in ECIR's version
+                of YAKE, defaults to True.
+            pool_best (bool): Only apply if `use_stems` is False. If False
+                outputs will be lowercased form keyphrases instead of stemmed.
+                If True, outputs will be stemmed and scores will be the best
+                score of the lowercased version of the keyphrase. Defaults to
+                False.
         """
         if not self.candidates:
             return
@@ -407,13 +414,14 @@ class YAKE2(LoadFile):
                 # Adding `-` so the higher weight is the better
                 w = -prod_ / (TF * (1 + sum_))
             lex = k
-            if not use_stems:
+            if not use_stems and pool_best:
+                # If not using stems and use best lowercased score.
                 lex = v.stemmed
             if lex not in self.weights:
                 self.weights[lex] = w
             else:
                 self.weights[lex] = max(self.weights[lex], w)
-        if not use_stems:
+        if not use_stems and pool_best:
             self.candidates = self.stemmed_candidates
 
     def is_redundant(self, candidate, prev, threshold=0.8):
@@ -433,10 +441,17 @@ class YAKE2(LoadFile):
             # TODO: Very hacky, what could we do to better use inheritance
             #       in this case ?
             threshold = self._threshold
+        if all(not hasattr(c, 'stemmed') for c in self.candidates.values()):
+            # `use_stems=False` and `pool_best=True` so `candidate` and `prev` are stems
+            # This will also happen if use_stems was True so that's not good
+            candidate = ' '.join(self.candidates[candidate].surface_forms[0]).lower()
+            prev = [' '.join(self.candidates[p].surface_forms[0]).lower() for p in prev]
         for prev_candidate in prev:
             dist = edit_distance(candidate, prev_candidate)
             dist /= max(len(candidate), len(prev_candidate))
+            print(candidate, prev_candidate, dist)
             if (1.0 - dist) > threshold:
+                print(candidate, 'ise redundant')
                 return True
         return False
 

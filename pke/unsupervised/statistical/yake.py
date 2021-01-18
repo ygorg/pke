@@ -321,7 +321,7 @@ class YAKE(LoadFile):
             E = self.features[word]['DIFFERENT']
             self.features[word]['weight'] = (D * B) / (A + (C / D) + (E / D))
 
-    def candidate_weighting(self, window=2, stoplist=None, use_stems=False):
+    def candidate_weighting(self, window=2, stoplist=None, use_stems=False, no_overwrite=False):
         """Candidate weight calculation as described in the YAKE paper.
 
         Args:
@@ -388,8 +388,12 @@ class YAKE(LoadFile):
                         #  the end of the sentence
                         # Setting sum_ to -1+eps so 1+sum_ != 0
                         sum_ = -0.99999999999
-                    self.weights[candidate] = prod_
-                    self.weights[candidate] /= TF * (1 + sum_)
+                    w = prod_
+                    w /= TF * (1 + sum_)
+                    if no_overwrite and candidate in self.weights:
+                        self.weights[candidate] = min(w, self.weights[candidate])
+                    else:
+                       self.weights[candidate] = w
                     self.surface_to_lexical[candidate] = k
 
                     # weights = [self.features[t.lower()]['weight'] for t
@@ -415,7 +419,9 @@ class YAKE(LoadFile):
         for prev_candidate in prev:
             dist = edit_distance(candidate, prev_candidate)
             dist /= max(len(candidate), len(prev_candidate))
+            print(candidate, prev_candidate, dist)
             if (1.0 - dist) > threshold:
+                print(candidate, 'is_redundant')
                 return True
         return False
 
